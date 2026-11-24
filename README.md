@@ -1,5 +1,7 @@
 # zoritto — Complete Product & Engineering Specification
 
+For the implemented single-user API, setup, and Vercel deployment instructions, see [mvp.md](./mvp.md). The broader specification below is not the scope of the initial implementation.
+
 ## 1. Project Overview
 
 Build a production-ready web application named **zoritto**.
