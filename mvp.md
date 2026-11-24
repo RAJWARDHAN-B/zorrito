@@ -291,7 +291,7 @@ npm run build
 
 ### API usage
 
-For an agent-facing endpoint reference, see [API.md](./API.md).
+For an agent-facing endpoint reference, see [API.md](./API.md). After deployment, the same public, plain-text reference is available at `/docs`; it contains no credentials.
 
 Every endpoint except health requires `Authorization: Bearer <ZORITTO_API_KEY>`. For local testing, load the agent key into `ZORITTO_API_KEY` in your shell without committing it; beware that shell history, terminal output, and process inspection can expose secrets. Encode tab names and record IDs as URL path segments.
 
