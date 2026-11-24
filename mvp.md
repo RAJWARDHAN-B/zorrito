@@ -124,7 +124,7 @@ The API key is a credential to zoritto, not a Google credential. Treat it as sen
 
 - The first row contains unique, non-empty column headers.
 - Each data row must have a unique, non-empty value in the `id` column.
-- New record IDs are generated server-side; clients cannot choose or change them.
+- New record IDs are assigned server-side as the highest existing numeric ID in that tab plus one, or `1` for an empty tab; clients cannot choose or change them.
 - Updates identify a row by its `id`, not by its current row number.
 - Updates may change only supplied, recognized fields. Unknown columns and attempts to modify `id` are rejected.
 - Write only the cells that changed. Do not rewrite an entire worksheet when updating one record.
@@ -156,7 +156,7 @@ Searches an allowed field in a bounded worksheet range. Support documented match
 
 ### `POST /api/v1/tabs/{tab}/records`
 
-Adds a record. Accept only known fields, generate the `id` on the server, and append the row without treating user-supplied values as formulas.
+Adds a record. Accept only known fields, assign the next numeric `id` on the server, and append the row without treating user-supplied values as formulas.
 
 ### `PATCH /api/v1/tabs/{tab}/records/{id}`
 
@@ -170,7 +170,7 @@ Example success response:
 {
   "success": true,
   "data": {
-    "id": "generated-record-id"
+    "id": "4"
   }
 }
 ```
@@ -318,10 +318,10 @@ curl -X PATCH -H "Authorization: Bearer $ZORITTO_API_KEY" \
   http://localhost:3000/api/v1/tabs/Contacts/records/RECORD_ID
 ```
 
-Create and update accept a JSON object with scalar strings, finite numbers, booleans, or `null` (`null` clears a cell). A body is limited to 16 KiB, and string values to 5,000 characters. For create, omitted columns are empty. Responses return formatted Sheets values as strings, including calculated formula results; search matches those formatted values case-insensitively. `match` is `contains` by default or `exact`. Pagination defaults to `limit=50&offset=0`; `limit` is 1–100.
+Create and update accept a JSON object with scalar strings, finite numbers, booleans, or `null` (`null` clears a cell). A body is limited to 16 KiB, and string values to 5,000 characters. For create, omitted columns are empty. New IDs are the highest current numeric ID in the tab plus one. To create records, existing IDs must be non-negative whole numbers in plain decimal notation without leading zeros and smaller than `9007199254740991`; earlier non-numeric IDs must be changed manually first. Responses return formatted Sheets values as strings, including calculated formula results; search matches those formatted values case-insensitively. `match` is `contains` by default or `exact`. Pagination defaults to `limit=50&offset=0`; `limit` is 1–100.
 
 Writes use `RAW`, so `=...` supplied by the agent is stored as text. Updates reject cells that appear to contain formulas. Formula editing, record deletion, and arbitrary ranges are not supported.
 
-**Concurrency:** the API resolves a record ID to a row and then writes cells in that row. Google Sheets does not provide an atomic compare-and-write through this implementation. Concurrent row insertions, deletions, or edits—including direct edits in Google Sheets—can cause lost updates or a write to the wrong row. Do not restructure or concurrently edit a sheet while the agent is writing; use a test sheet and backups. Read retries are bounded, but writes are not retried automatically: if a write times out, inspect the sheet before retrying because it may have succeeded.
+**Concurrency:** the API resolves a record ID to a row and then writes cells in that row. Google Sheets does not provide an atomic compare-and-write through this implementation. Concurrent row insertions, deletions, or edits—including direct edits in Google Sheets—can cause lost updates or a write to the wrong row. Concurrent creates can also choose the same next ID, so create records one at a time. If the highest-numbered row is deleted outside the API, its ID may be reused. Do not restructure or concurrently edit a sheet while the agent is writing; use a test sheet and backups. Read retries are bounded, but writes are not retried automatically: if a write times out, inspect the sheet before retrying because it may have succeeded.
 
 No persistent audit log or distributed rate limiter is included. Vercel logs contain request method, a generated request ID, result, and error code—not request bodies or cell contents. The API key allows all implemented operations on all allowlisted tabs, so protect it as a write credential.

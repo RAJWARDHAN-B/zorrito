@@ -1,4 +1,3 @@
-import { randomUUID } from "node:crypto";
 import { AppError, badRequest } from "@/lib/errors";
 import { appendRow, readFormulaRow, readSheet, updateCells } from "@/lib/google-sheets";
 import type { RecordInput } from "@/lib/http";
@@ -64,10 +63,22 @@ export async function listRecords(tab: string, limit: number, offset: number, se
 
 export async function createRecord(tab: string, input: RecordInput) {
   const values = await readSheet(tab);
-  const { headers } = parseSheet(values);
+  const { headers, rows } = parseSheet(values);
   validateFields(headers, input);
   if (values.length >= 10001) throw new AppError(422, "SHEET_TOO_LARGE", "Worksheet has reached the record limit.");
-  const id = randomUUID();
+  let maxId = 0;
+  for (const { record } of rows) {
+    const existingId = String(record.id);
+    const numericId = Number(existingId);
+    if (!/^(0|[1-9]\d*)$/.test(existingId) || !Number.isSafeInteger(numericId)) {
+      throw new AppError(422, "INVALID_NUMERIC_ID", "Existing record IDs must be non-negative whole numbers to create a record.");
+    }
+    maxId = Math.max(maxId, numericId);
+  }
+  if (maxId >= Number.MAX_SAFE_INTEGER) {
+    throw new AppError(422, "INVALID_NUMERIC_ID", "The largest record ID is too large to increment.");
+  }
+  const id = String(maxId + 1);
   const row = headers.map((header) => header === "id" ? id : normalize(input[header] ?? ""));
   await appendRow(tab, row);
   return { id };

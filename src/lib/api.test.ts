@@ -30,8 +30,8 @@ beforeEach(() => {
   vi.stubEnv("ZORITTO_API_KEY", key);
   vi.spyOn(console, "info").mockImplementation(() => {});
   vi.spyOn(console, "error").mockImplementation(() => {});
-  vi.mocked(readSheet).mockResolvedValue([["id", "name"], ["a", "Alice"]]);
-  vi.mocked(readFormulaRow).mockResolvedValue(["a", "Alice"]);
+  vi.mocked(readSheet).mockResolvedValue([["id", "name"], ["1", "Alice"]]);
+  vi.mocked(readFormulaRow).mockResolvedValue(["1", "Alice"]);
   vi.mocked(appendRow).mockResolvedValue();
   vi.mocked(updateCells).mockResolvedValue();
 });
@@ -56,12 +56,14 @@ describe("API routes", () => {
 
   it("reads, searches, creates, and updates through authenticated routes", async () => {
     const list = await getRecords(request("/api/v1/tabs/Contacts/records"), context);
-    expect(await list.json()).toMatchObject({ success: true, data: { records: [{ id: "a", name: "Alice" }] } });
+    expect(await list.json()).toMatchObject({ success: true, data: { records: [{ id: "1", name: "Alice" }] } });
     const result = await search(request("/api/v1/tabs/Contacts/search?field=name&value=ali"), context);
     expect((await result.json()).data.pagination.total).toBe(1);
-    expect((await postRecord(request("/api/v1/tabs/Contacts/records", "POST", JSON.stringify({ name: "=1+1" })), context)).status).toBe(200);
-    expect(appendRow).toHaveBeenCalledWith("Contacts", [expect.any(String), "=1+1"]);
-    const patch = await patchRecord(request("/api/v1/tabs/Contacts/records/a", "PATCH", JSON.stringify({ name: "Bob" })), { params: Promise.resolve({ tab: "Contacts", id: "a" }) });
+    const create = await postRecord(request("/api/v1/tabs/Contacts/records", "POST", JSON.stringify({ name: "=1+1" })), context);
+    expect(create.status).toBe(200);
+    expect(await create.json()).toMatchObject({ data: { id: "2" } });
+    expect(appendRow).toHaveBeenCalledWith("Contacts", ["2", "=1+1"]);
+    const patch = await patchRecord(request("/api/v1/tabs/Contacts/records/1", "PATCH", JSON.stringify({ name: "Bob" })), { params: Promise.resolve({ tab: "Contacts", id: "1" }) });
     expect(patch.status).toBe(200);
     expect(updateCells).toHaveBeenCalledWith("Contacts", 2, [[1, "Bob"]]);
   });

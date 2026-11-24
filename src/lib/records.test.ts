@@ -45,13 +45,33 @@ describe("worksheet records", () => {
     expect(() => parseSheet(values)).toThrow("unique");
   });
 
-  it("generates IDs and preserves formula-like input as a value", async () => {
+  it("generates the next highest ID and preserves formula-like input as a value", async () => {
+    vi.mocked(readSheet).mockResolvedValue([
+      ["id", "name", "note"],
+      ["7", "Alice", "hello"],
+      ["2", "Bob", "world"],
+    ]);
     const result = await createRecord("Contacts", { name: "=1+1" });
-    expect(result.id).toMatch(/^[0-9a-f-]{36}$/);
-    expect(appendRow).toHaveBeenCalledWith("Contacts", [result.id, "=1+1", ""]);
+    expect(result.id).toBe("8");
+    expect(appendRow).toHaveBeenCalledWith("Contacts", ["8", "=1+1", ""]);
     await expect(createRecord("Contacts", { id: "chosen" })).rejects.toMatchObject({ status: 400 });
     await expect(createRecord("Contacts", { unknown: "x" })).rejects.toMatchObject({ status: 400 });
   });
+
+  it("starts at 1 on an empty worksheet", async () => {
+    vi.mocked(readSheet).mockResolvedValue([["id", "name"]]);
+    expect(await createRecord("Contacts", { name: "Alice" })).toEqual({ id: "1" });
+    expect(appendRow).toHaveBeenCalledWith("Contacts", ["1", "Alice"]);
+  });
+
+  it.each(["old-uuid", "-1", "1.5", "01", "9007199254740991", "9007199254740992"])(
+    "rejects a non-numeric or unincrementable existing ID %s without writing",
+    async (id) => {
+      vi.mocked(readSheet).mockResolvedValue([["id", "name"], [id, "Alice"]]);
+      await expect(createRecord("Contacts", { name: "Bob" })).rejects.toMatchObject({ code: "INVALID_NUMERIC_ID" });
+      expect(appendRow).not.toHaveBeenCalled();
+    },
+  );
 
   it("updates only supplied fields and prevents modifying formula cells", async () => {
     await updateRecord("Contacts", "one", { note: "changed" });
